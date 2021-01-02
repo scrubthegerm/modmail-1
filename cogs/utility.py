@@ -247,6 +247,8 @@ class ModmailHelpCommand(commands.HelpCommand):
                 "for a list of all available commands."
             )
         await self.get_destination().send(embed=embed)
+
+
 class Utility(commands.Cog):
     """General commands that provide utility."""
 
@@ -360,7 +362,6 @@ class Utility(commands.Cog):
     async def mention(self, ctx, *mention: Union[discord.Role, discord.Member]):
         """
         Change what the bot mentions at the start of each thread.
-
         Type only `{prefix}mention` to retrieve your current "mention" message.
         """
         # TODO: ability to disable mention.
@@ -387,7 +388,6 @@ class Utility(commands.Cog):
     async def prefix(self, ctx, *, prefix=None):
         """
         Change the prefix of the bot.
-
         Type only `{prefix}prefix` to retrieve your current bot prefix.
         """
 
@@ -410,22 +410,17 @@ class Utility(commands.Cog):
     async def permissions(self, ctx):
         """
         Set the permissions for Modmail commands.
-
         You may set permissions based on individual command names, or permission
         levels.
-
         Acceptable permission levels are:
             - **Owner** [5] (absolute control over the bot)
             - **Administrator** [4] (administrative powers such as setting activities)
             - **Moderator** [3] (ability to block)
             - **Supporter** [2] (access to core Modmail supporting functions)
             - **Regular** [1] (most basic interactions such as help and about)
-
         By default, owner is set to the absolute bot owner and regular is `@everyone`.
-
         To set permissions, see `{prefix}help permissions add`; and to change permission level for specific
         commands see `{prefix}help permissions override`.
-
         Note: You will still have to manually give/take permission to the Modmail
         category to users/roles.
         """
@@ -463,17 +458,13 @@ class Utility(commands.Cog):
     async def permissions_override(self, ctx, command_name: str.lower, *, level_name: str):
         """
         Change a permission level for a specific command.
-
         Examples:
         - `{prefix}perms override reply administrator`
         - `{prefix}perms override "plugin enabled" moderator`
-
         To undo a permission override, see `{prefix}help permissions remove`.
-
         Example:
         - `{prefix}perms remove override reply`
         - `{prefix}perms remove override plugin enabled`
-
         You can retrieve a single or all command level override(s), see`{prefix}help permissions get`.
         """
 
@@ -522,16 +513,13 @@ class Utility(commands.Cog):
     ):
         """
         Add a permission to a command or a permission level.
-
         For sub commands, wrap the complete command name with quotes.
         To find a list of permission levels, see `{prefix}help perms`.
-
         Examples:
         - `{prefix}perms add level REGULAR everyone`
         - `{prefix}perms add command reply @user`
         - `{prefix}perms add command "plugin enabled" @role`
         - `{prefix}perms add command help 984301093849028`
-
         Do not ping `@everyone` for granting permission to everyone, use "everyone" or "all" instead.
         """
 
@@ -596,10 +584,8 @@ class Utility(commands.Cog):
     ):
         """
         Remove permission to use a command, permission level, or command level override.
-
         For sub commands, wrap the complete command name with quotes.
         To find a list of permission levels, see `{prefix}help perms`.
-
         Examples:
         - `{prefix}perms remove level REGULAR everyone`
         - `{prefix}perms remove command reply @user`
@@ -607,7 +593,6 @@ class Utility(commands.Cog):
         - `{prefix}perms remove command help 984301093849028`
         - `{prefix}perms remove override block`
         - `{prefix}perms remove override "snippet add"`
-
         Do not ping `@everyone` for granting permission to everyone, use "everyone" or "all" instead.
         """
         if type_ not in {"command", "level", "override"} or (
@@ -728,28 +713,20 @@ class Utility(commands.Cog):
     ):
         """
         View the currently-set permissions.
-
         To find a list of permission levels, see `{prefix}help perms`.
-
         To view all command and level permissions:
-
         Examples:
         - `{prefix}perms get @user`
         - `{prefix}perms get 984301093849028`
-
         To view all users and roles of a command or level permission:
-
         Examples:
         - `{prefix}perms get command reply`
         - `{prefix}perms get command plugin remove`
         - `{prefix}perms get level SUPPORTER`
-
         To view command level overrides:
-
         Examples:
         - `{prefix}perms get override block`
         - `{prefix}perms get override permissions add`
-
         Do not ping `@everyone` for granting permission to everyone, use "everyone" or "all" instead.
         """
 
@@ -905,7 +882,6 @@ class Utility(commands.Cog):
     async def oauth(self, ctx):
         """
         Commands relating to logviewer oauth2 login authentication.
-
         This functionality on your logviewer site is a [**Patron**](https://patreon.com/kyber) only feature.
         """
         await ctx.send_help(ctx.command)
@@ -915,7 +891,6 @@ class Utility(commands.Cog):
     async def oauth_whitelist(self, ctx, target: Union[discord.Role, utils.User]):
         """
         Whitelist or un-whitelist a user or role to have access to logs.
-
         `target` may be a role ID, name, mention, user ID, name, or mention.
         """
         whitelisted = self.bot.config["oauth_whitelist"]
