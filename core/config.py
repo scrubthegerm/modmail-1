@@ -45,7 +45,7 @@ class ConfigManager:
         "mention_channel_id": None,
         "update_channel_id": None,
         # threads
-        "sent_emoji": "✅",
+        "sent_emoji": "📨",
         "blocked_emoji": "🚫",
         "close_emoji": "🔒",
         "recipient_thread_close": False,
@@ -101,8 +101,8 @@ class ConfigManager:
 
     private_keys = {
         # bot presence
-        "activity_message": "",
-        "activity_type": None,
+        "activity_message": "Listening to DMs",
+        "activity_type": 1,
         "status": None,
         "dm_disabled": DMDisabled.NONE,
         "oauth_whitelist": [],
