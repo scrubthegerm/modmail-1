@@ -102,8 +102,8 @@ class ConfigManager:
     private_keys = {
         # bot presence
         "activity_message": "Listening to DMs",
-        "activity_type": 1,
-        "status": None,
+        "activity_type": 2,
+        "status": online,
         "dm_disabled": DMDisabled.NONE,
         "oauth_whitelist": [],
         # moderation
