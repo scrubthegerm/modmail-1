@@ -247,6 +247,26 @@ class ModmailHelpCommand(commands.HelpCommand):
                 "for a list of all available commands."
             )
         await self.get_destination().send(embed=embed)
+class Utility(commands.Cog):
+    """General commands that provide utility."""
+
+    def __init__(self, bot):
+        self.bot = bot
+        self._original_help_command = bot.help_command
+        self.bot.help_command = ModmailHelpCommand(
+            command_attrs={
+                "help": "Shows this help message.",
+                "checks": [checks.has_permissions_predicate(PermissionLevel.REGULAR)],
+            },
+        )
+        self.bot.help_command.cog = self
+        self.loop_presence.start()  # pylint: disable=no-member
+        if not self.bot.config.get("enable_eval"):
+            self.eval_.enabled = False
+            logger.info("Eval disabled. enable_eval=False")
+
+    def cog_unload(self):
+        self.bot.help_command = self._original_help_command
 
     @commands.group(invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
