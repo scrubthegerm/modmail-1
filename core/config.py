@@ -103,7 +103,7 @@ class ConfigManager:
         # bot presence
         "activity_message": "Listening to DMs",
         "activity_type": 2,
-        "status": online,
+        "status": none,
         "dm_disabled": DMDisabled.NONE,
         "oauth_whitelist": [],
         # moderation
