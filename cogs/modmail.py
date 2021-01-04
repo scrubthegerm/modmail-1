@@ -35,7 +35,7 @@ class Modmail(commands.Cog):
     @checks.has_permissions(PermissionLevel.OWNER)
     async def setup(self, ctx):
         """
-        Sets up a server for Modmail.
+        Sets up the server for Modmail.
 
         You only need to run this command
         once after configuring Modmail.
@@ -92,8 +92,8 @@ class Modmail(commands.Cog):
         embed = discord.Embed(
             title="Friendly Reminder",
             description=f"Unfortunately you cannot change the log channel "
-            "but you can rename it and move it at will "
-            f"{log_channel.mention} log channel.",
+            "but you can rename it and move it at will, "
+            f"you can find it here: {log_channel.mention}.",
             color=self.bot.main_color,
         )
 
