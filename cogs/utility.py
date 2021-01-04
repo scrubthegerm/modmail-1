@@ -324,6 +324,18 @@ class Utility(commands.Cog):
         session.current = len(messages) - 1
         return await session.run()
 
+     @commands.command()
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
+    @utils.trigger_typing
+    async def ping(self, ctx):
+        """Pong! Returns your websocket latency."""
+        embed = discord.Embed(
+            title="Pong! Websocket Latency:",
+            description=f"{self.bot.ws.latency * 1000:.4f} ms",
+            color=self.bot.main_color,
+        )
+        return await ctx.send(embed=embed)
+
     @debug.command(name="clear", aliases=["wipe"])
     @checks.has_permissions(PermissionLevel.OWNER)
     @utils.trigger_typing
