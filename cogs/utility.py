@@ -249,7 +249,8 @@ class ModmailHelpCommand(commands.HelpCommand):
         await self.get_destination().send(embed=embed)
 
 class Utility(commands.Cog):
-    """General commands that provide utility."""
+    """
+    General commands that provide utility."""
 
     def __init__(self, bot):
         self.bot = bot
