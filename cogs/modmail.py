@@ -91,8 +91,8 @@ class Modmail(commands.Cog):
 
         embed = discord.Embed(
             title="Friendly Reminder",
-            description=f"You may use the `{self.bot.prefix}config set log_channel_id "
-            "<channel-id>` command to set up a custom log channel, then you can delete this default "
+            description=f"Unfortunately you cannot change the log channel "
+            "but you can rename it and move it at will "
             f"{log_channel.mention} log channel.",
             color=self.bot.main_color,
         )
@@ -106,11 +106,6 @@ class Modmail(commands.Cog):
         await self.bot.config.update()
         await ctx.send(
             "**Successfully set up server.**\n"
-            "Consider setting permission levels to give access to roles "
-            "or users the ability to use Modmail.\n\n"
-            f"Type:\n- `{self.bot.prefix}permissions` and `{self.bot.prefix}permissions add` "
-            "for more info on setting permissions.\n"
-            f"- `{self.bot.prefix}config help` for a list of available customizations."
         )
 
         if not self.bot.config["command_permissions"] and not self.bot.config["level_permissions"]:
