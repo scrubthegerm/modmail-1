@@ -323,27 +323,6 @@ class Utility(commands.Cog):
         session.current = len(messages) - 1
         return await session.run()
 
-    @debug.command(name="clear", aliases=["wipe"])
-    @checks.has_permissions(PermissionLevel.OWNER)
-    @utils.trigger_typing
-    async def debug_clear(self, ctx):
-        """Clears the locally cached logs."""
-
-        log_file_name = self.bot.token.split(".")[0]
-
-        with open(
-            os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), f"../temp/{log_file_name}.log"
-            ),
-            "w",
-        ):
-            pass
-        await ctx.send(
-            embed=discord.Embed(
-                color=self.bot.main_color, description="Cached logs are now cleared."
-            )
-        )
-
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
     @utils.trigger_typing
@@ -355,54 +334,6 @@ class Utility(commands.Cog):
             color=self.bot.main_color,
         )
         return await ctx.send(embed=embed)
-
-    @commands.command()
-    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    async def mention(self, ctx, *mention: Union[discord.Role, discord.Member]):
-        """
-        Change what the bot mentions at the start of each thread.
-        Type only `{prefix}mention` to retrieve your current "mention" message.
-        """
-        # TODO: ability to disable mention.
-        current = self.bot.config["mention"]
-
-        if not mention:
-            embed = discord.Embed(
-                title="Current mention:", color=self.bot.main_color, description=str(current)
-            )
-        else:
-            mention = " ".join(i.mention for i in mention)
-            embed = discord.Embed(
-                title="Changed mention!",
-                description=f'On thread creation the bot now says "{mention}".',
-                color=self.bot.main_color,
-            )
-            self.bot.config["mention"] = mention
-            await self.bot.config.update()
-
-        return await ctx.send(embed=embed)
-
-    @commands.command()
-    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    async def prefix(self, ctx, *, prefix=None):
-        """
-        Change the prefix of the bot.
-        Type only `{prefix}prefix` to retrieve your current bot prefix.
-        """
-
-        current = self.bot.prefix
-        embed = discord.Embed(
-            title="Current prefix", color=self.bot.main_color, description=f"{current}"
-        )
-
-        if prefix is None:
-            await ctx.send(embed=embed)
-        else:
-            embed.title = "Changed prefix!"
-            embed.description = f"Set prefix to `{prefix}`"
-            self.bot.config["prefix"] = prefix
-            await self.bot.config.update()
-            await ctx.send(embed=embed)
 
     @commands.group(aliases=["perms"], invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
@@ -876,15 +807,6 @@ class Utility(commands.Cog):
         session = EmbedPaginatorSession(ctx, *embeds)
         return await session.run()
 
-    @commands.group(invoke_without_command=True)
-    @checks.has_permissions(PermissionLevel.OWNER)
-    async def oauth(self, ctx):
-        """
-        Commands relating to logviewer oauth2 login authentication.
-        This functionality on your logviewer site is a [**Patron**](https://patreon.com/kyber) only feature.
-        """
-        await ctx.send_help(ctx.command)
-
     @oauth.command(name="whitelist")
     @checks.has_permissions(PermissionLevel.OWNER)
     async def oauth_whitelist(self, ctx, target: Union[discord.Role, utils.User]):
@@ -940,74 +862,3 @@ class Utility(commands.Cog):
         embed.add_field(name="Roles", value=" ".join(r.mention for r in roles) or "None")
 
         await ctx.send(embed=embed)
-
-    @commands.group(invoke_without_command=True)
-    @checks.has_permissions(PermissionLevel.OWNER)
-    async def autotrigger(self, ctx):
-        """Automatically trigger alias-like commands based on a certain keyword in the user's inital message"""
-        await ctx.send_help(ctx.command)
-
-    @autotrigger.command(name="add")
-    @checks.has_permissions(PermissionLevel.OWNER)
-    async def autotrigger_add(self, ctx, keyword, *, command):
-        """Adds a trigger to automatically trigger an alias-like command"""
-        if keyword in self.bot.auto_triggers:
-            embed = discord.Embed(
-                title="Error",
-                color=self.bot.error_color,
-                description=f"Another autotrigger with the same name already exists: `{keyword}`.",
-            )
-        else:
-            self.bot.auto_triggers[keyword] = command
-            await self.bot.config.update()
-
-            embed = discord.Embed(
-                title="Success",
-                color=self.bot.main_color,
-                description=f"Keyword `{keyword}` has been linked to `{command}`.",
-            )
-
-        await ctx.send(embed=embed)
-
-    @autotrigger.command(name="edit")
-    @checks.has_permissions(PermissionLevel.OWNER)
-    async def autotrigger_edit(self, ctx, keyword, *, command):
-        """Edits a pre-existing trigger to automatically trigger an alias-like command"""
-        if keyword not in self.bot.auto_triggers:
-            embed = utils.create_not_found_embed(
-                keyword, self.bot.auto_triggers.keys(), "Autotrigger"
-            )
-        else:
-            self.bot.auto_triggers[keyword] = command
-            await self.bot.config.update()
-
-            embed = discord.Embed(
-                title="Success",
-                color=self.bot.main_color,
-                description=f"Keyword `{keyword}` has been linked to `{command}`.",
-            )
-
-        await ctx.send(embed=embed)
-
-    @autotrigger.command(name="remove")
-    @checks.has_permissions(PermissionLevel.OWNER)
-    async def autotrigger_remove(self, ctx, keyword):
-        """Removes a trigger to automatically trigger an alias-like command"""
-        try:
-            del self.bot.auto_triggers[keyword]
-        except KeyError:
-            embed = discord.Embed(
-                title="Error",
-                color=self.bot.error_color,
-                description=f"Keyword `{keyword}` could not be found.",
-            )
-            await ctx.send(embed=embed)
-        else:
-            await self.bot.config.update()
-
-            embed = discord.Embed(
-                title="Success",
-                color=self.bot.main_color,
-                description=f"Keyword `{keyword}` has been removed.",
-            )
-            await ctx.send(embed=embed)
