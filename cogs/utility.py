@@ -347,18 +347,6 @@ class Utility(commands.Cog):
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
-    @utils.trigger_typing
-    async def ping(self, ctx):
-        """Pong! Returns your websocket latency."""
-        embed = discord.Embed(
-            title="Pong! Websocket Latency:",
-            description=f"{self.bot.ws.latency * 1000:.4f} ms",
-            color=self.bot.main_color,
-        )
-        return await ctx.send(embed=embed)
-
-    @commands.command()
-    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
     async def mention(self, ctx, *mention: Union[discord.Role, discord.Member]):
         """
         Change what the bot mentions at the start of each thread.
