@@ -334,8 +334,8 @@ class Utility(commands.Cog):
             color=self.bot.main_color,
         )
         return await ctx.send(embed=embed)
-
-    @commands.group(aliases=["perms"], invoke_without_command=True)
+    
+               @commands.group(aliases=["perms"], invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
     async def permissions(self, ctx):
         """
@@ -806,7 +806,7 @@ class Utility(commands.Cog):
 
         session = EmbedPaginatorSession(ctx, *embeds)
         return await session.run()
-
+    
     @oauth.command(name="whitelist")
     @checks.has_permissions(PermissionLevel.OWNER)
     async def oauth_whitelist(self, ctx, target: Union[discord.Role, utils.User]):
