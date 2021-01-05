@@ -862,3 +862,7 @@ class Utility(commands.Cog):
         embed.add_field(name="Roles", value=" ".join(r.mention for r in roles) or "None")
 
         await ctx.send(embed=embed)
+
+        
+        def setup(bot):
+    bot.add_cog(Utility(bot))
