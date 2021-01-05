@@ -864,5 +864,5 @@ class Utility(commands.Cog):
         await ctx.send(embed=embed)
 
         
-        def setup(bot):
+def setup(bot):
     bot.add_cog(Utility(bot))
