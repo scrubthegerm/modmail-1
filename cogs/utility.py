@@ -323,6 +323,7 @@ class Utility(commands.Cog):
         session.current = len(messages) - 1
         return await session.run()
 
+    class Utility(commands.Cog):
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
     @utils.trigger_typing
@@ -335,6 +336,7 @@ class Utility(commands.Cog):
         )
         return await ctx.send(embed=embed)
     
+    class Utility(commands.Cog):
     @commands.group(aliases=["perms"], invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
     async def permissions(self, ctx):
