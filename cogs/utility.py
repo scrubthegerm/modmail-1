@@ -335,7 +335,7 @@ class Utility(commands.Cog):
         )
         return await ctx.send(embed=embed)
     
-               @commands.group(aliases=["perms"], invoke_without_command=True)
+    @commands.group(aliases=["perms"], invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
     async def permissions(self, ctx):
         """
