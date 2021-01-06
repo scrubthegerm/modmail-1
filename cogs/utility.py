@@ -866,6 +866,5 @@ class Utility(commands.Cog):
 
         await self.bot.add_reaction(ctx.message, "\u2705")
 
-
-  def cog_unload(self):
-        self.bot.help_command = self._original_help_command
+            def setup(bot):
+    bot.add_cog(Utility(bot))
