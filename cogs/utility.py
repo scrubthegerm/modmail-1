@@ -260,7 +260,7 @@ class Utility(commands.Cog):
                 "help": "Shows this help message.",
                 "checks": [checks.has_permissions_predicate(PermissionLevel.REGULAR)],
             },
-        )
+       
         self.bot.help_command.cog = self
         self.loop_presence.start()  # pylint: disable=no-member
         if not self.bot.config.get("enable_eval"):
