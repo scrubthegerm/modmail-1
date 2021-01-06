@@ -324,9 +324,8 @@ class Utility(commands.Cog):
         session.current = len(messages) - 1
         return await session.run()
 
-    class Utility(commands.Cog):
     @commands.command()
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
     @utils.trigger_typing
     async def ping(self, ctx):
         """Pong! Returns your websocket latency."""
@@ -336,8 +335,7 @@ class Utility(commands.Cog):
             color=self.bot.main_color,
         )
         return await ctx.send(embed=embed)
-    
-    class Utility(commands.Cog):
+
     @commands.group(aliases=["perms"], invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
     async def permissions(self, ctx):
@@ -809,7 +807,7 @@ class Utility(commands.Cog):
 
         session = EmbedPaginatorSession(ctx, *embeds)
         return await session.run()
-    
+
     @oauth.command(name="whitelist")
     @checks.has_permissions(PermissionLevel.OWNER)
     async def oauth_whitelist(self, ctx, target: Union[discord.Role, utils.User]):
@@ -866,6 +864,8 @@ class Utility(commands.Cog):
 
         await ctx.send(embed=embed)
 
-        
+        await self.bot.add_reaction(ctx.message, "\u2705")
+
+
 def setup(bot):
     bot.add_cog(Utility(bot))
