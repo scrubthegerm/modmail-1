@@ -31,7 +31,7 @@ class Modmail(commands.Cog):
         self.bot = bot
 
     @commands.group(aliases=["snippets"], invoke_without_command=True)
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     async def snippet(self, ctx, *, name: str.lower = None):
         """
         Create pre-defined messages for use in threads.
@@ -184,7 +184,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(usage="<category> [options]")
-    @checks.has_permissions(PermissionLevel.MODERATOR)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def move(self, ctx, *, arguments):
         """
@@ -261,7 +261,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(usage="[after] [close message]")
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def close(self, ctx, *, after: UserFriendlyTime = None):
         """
@@ -405,7 +405,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command()
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def reply(self, ctx, *, msg: str = ""):
         """
@@ -418,7 +418,7 @@ class Modmail(commands.Cog):
             await ctx.thread.reply(ctx.message)
 
     @commands.command(aliases=["formatreply"])
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def freply(self, ctx, *, msg: str = ""):
         """
@@ -438,7 +438,7 @@ class Modmail(commands.Cog):
             await ctx.thread.reply(ctx.message)
 
     @commands.command(aliases=["anonreply", "anonymousreply"])
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def areply(self, ctx, *, msg: str = ""):
         """
@@ -752,7 +752,7 @@ class Modmail(commands.Cog):
         return await ctx.send(embed=embed)
 
     @commands.command()
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def delete(self, ctx, message_id: int = None):
         """
