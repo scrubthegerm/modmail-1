@@ -303,84 +303,6 @@ class Utility(commands.Cog):
                     f"View the changelog here: {changelog.latest_version.changelog_url}#v{version[::2]}"
                 )
 
-    @commands.command(aliases=["info"])
-    @checks.has_permissions(PermissionLevel.REGULAR)
-    @utils.trigger_typing
-    async def about(self, ctx):
-        """Shows information about this bot."""
-        embed = discord.Embed(color=self.bot.main_color, timestamp=datetime.utcnow())
-        embed.set_author(
-            name="Modmail - About",
-            icon_url=self.bot.user.avatar_url,
-            url="https://discord.gg/F34cRU8",
-        )
-        embed.set_thumbnail(url=self.bot.user.avatar_url)
-
-        desc = "This is an open source Discord bot that serves as a means for "
-        desc += "members to easily communicate with server administrators in "
-        desc += "an organised manner."
-        embed.description = desc
-
-        embed.add_field(name="Uptime", value=self.bot.uptime)
-        embed.add_field(name="Latency", value=f"{self.bot.latency * 1000:.2f} ms")
-        embed.add_field(name="Version", value=f"`{self.bot.version}`")
-        embed.add_field(name="Authors", value="`kyb3r`, `Taki`, `fourjr`")
-        embed.add_field(name="Hosting Method", value=self.bot.hosting_method.name)
-
-        changelog = await Changelog.from_url(self.bot)
-        latest = changelog.latest_version
-
-        if self.bot.version.is_prerelease:
-            stable = next(
-                filter(lambda v: not parse_version(v.version).is_prerelease, changelog.versions)
-            )
-            footer = (
-                f"You are on the prerelease version • the latest version is v{stable.version}."
-            )
-        elif self.bot.version < parse_version(latest.version):
-            footer = f"A newer version is available v{latest.version}."
-        else:
-            footer = "You are up to date with the latest version."
-
-        embed.add_field(
-            name="Want Modmail in Your Server?",
-            value="Follow the installation guide on [GitHub](https://github.com/kyb3r/modmail/) "
-            "and join our [Discord server](https://discord.gg/F34cRU8)!",
-            inline=False,
-        )
-
-        embed.add_field(
-            name="Support the Developers",
-            value="This bot is completely free for everyone. We rely on kind individuals "
-            "like you to support us on [`Patreon`](https://patreon.com/kyber) (perks included) "
-            "to keep this bot free forever!",
-            inline=False,
-        )
-
-        embed.set_footer(text=footer)
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    @checks.has_permissions(PermissionLevel.REGULAR)
-    @utils.trigger_typing
-    async def sponsors(self, ctx):
-        """Shows a list of sponsors."""
-        resp = await self.bot.session.get(
-            "https://raw.githubusercontent.com/kyb3r/modmail/master/SPONSORS.json"
-        )
-        data = loads(await resp.text())
-
-        embeds = []
-
-        for elem in data:
-            embed = discord.Embed.from_dict(elem["embed"])
-            embeds.append(embed)
-
-        random.shuffle(embeds)
-
-        session = EmbedPaginatorSession(ctx, *embeds)
-        await session.run()
-
     @commands.group(invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.OWNER)
     @utils.trigger_typing
@@ -505,11 +427,8 @@ class Utility(commands.Cog):
             - `streaming`
             - `listening`
             - `watching`
-            - `competing`
         When activity type is set to `listening`,
         it must be followed by a "to": "listening to..."
-        When activity type is set to `competing`,
-        it must be followed by a "in": "competing in..."
         When activity type is set to `streaming`, you can set
         the linked twitch page:
         - `{prefix}config set twitch_url https://www.twitch.tv/somechannel/`
@@ -543,8 +462,6 @@ class Utility(commands.Cog):
         msg = f"Activity set to: {activity.type.name.capitalize()} "
         if activity.type == ActivityType.listening:
             msg += f"to {activity.name}."
-        elif activity.type == ActivityType.competing:
-            msg += f"in {activity.name}."
         else:
             msg += f"{activity.name}."
 
@@ -606,11 +523,6 @@ class Utility(commands.Cog):
             if activity_message.lower().startswith("to "):
                 # The actual message is after listening to [...]
                 # discord automatically add the "to"
-                activity_message = activity_message[3:].strip()
-        elif activity_type == ActivityType.competing:
-            if activity_message.lower().startswith("in "):
-                # The actual message is after listening to [...]
-                # discord automatically add the "in"
                 activity_message = activity_message[3:].strip()
         elif activity_type == ActivityType.streaming:
             url = self.bot.config["twitch_url"]
@@ -1415,15 +1327,15 @@ class Utility(commands.Cog):
                 if perm == -1:
                     values.insert(0, "**everyone**")
                     continue
-                member = ctx.guild.get_member(int(perm))
+                member = ctx.guild.get_member(perm)
                 if member is not None:
                     values.append(member.mention)
                     continue
-                user = self.bot.get_user(int(perm))
+                user = self.bot.get_user(perm)
                 if user is not None:
                     values.append(user.mention)
                     continue
-                role = ctx.guild.get_role(int(perm))
+                role = ctx.guild.get_role(perm)
                 if role is not None:
                     values.append(role.mention)
                 else:
@@ -1689,30 +1601,14 @@ class Utility(commands.Cog):
                 description=f"Another autotrigger with the same name already exists: `{keyword}`.",
             )
         else:
-            # command validation
-            valid = False
-            split_cmd = command.split(" ")
-            for n in range(1, len(split_cmd) + 1):
-                if self.bot.get_command(" ".join(split_cmd[0:n])):
-                    print(self.bot.get_command(" ".join(split_cmd[0:n])))
-                    valid = True
-                    break
+            self.bot.auto_triggers[keyword] = command
+            await self.bot.config.update()
 
-            if valid:
-                self.bot.auto_triggers[keyword] = command
-                await self.bot.config.update()
-
-                embed = discord.Embed(
-                    title="Success",
-                    color=self.bot.main_color,
-                    description=f"Keyword `{keyword}` has been linked to `{command}`.",
-                )
-            else:
-                embed = discord.Embed(
-                    title="Error",
-                    color=self.bot.error_color,
-                    description="Invalid command. Note that autotriggers do not work with aliases.",
-                )
+            embed = discord.Embed(
+                title="Success",
+                color=self.bot.main_color,
+                description=f"Keyword `{keyword}` has been linked to `{command}`.",
+            )
 
         await ctx.send(embed=embed)
 
@@ -1725,30 +1621,14 @@ class Utility(commands.Cog):
                 keyword, self.bot.auto_triggers.keys(), "Autotrigger"
             )
         else:
-            # command validation
-            valid = False
-            split_cmd = command.split(" ")
-            for n in range(1, len(split_cmd) + 1):
-                if self.bot.get_command(" ".join(split_cmd[0:n])):
-                    print(self.bot.get_command(" ".join(split_cmd[0:n])))
-                    valid = True
-                    break
+            self.bot.auto_triggers[keyword] = command
+            await self.bot.config.update()
 
-            if valid:
-                self.bot.auto_triggers[keyword] = command
-                await self.bot.config.update()
-
-                embed = discord.Embed(
-                    title="Success",
-                    color=self.bot.main_color,
-                    description=f"Keyword `{keyword}` has been linked to `{command}`.",
-                )
-            else:
-                embed = discord.Embed(
-                    title="Error",
-                    color=self.bot.error_color,
-                    description="Invalid command. Note that autotriggers do not work with aliases.",
-                )
+            embed = discord.Embed(
+                title="Success",
+                color=self.bot.main_color,
+                description=f"Keyword `{keyword}` has been linked to `{command}`.",
+            )
 
         await ctx.send(embed=embed)
 
@@ -1781,7 +1661,7 @@ class Utility(commands.Cog):
         """Tests a string against the current autotrigger setup"""
         for keyword in self.bot.auto_triggers:
             if self.bot.config.get("use_regex_autotrigger"):
-                check = re.search(keyword, text)
+                check = re.match(keyword, text)
                 regex = True
             else:
                 check = keyword.lower() in text.lower()
@@ -1848,7 +1728,6 @@ class Utility(commands.Cog):
     @commands.command()
     @checks.has_permissions(PermissionLevel.OWNER)
     @checks.github_token_required(ignore_if_not_heroku=True)
-    @checks.updates_enabled()
     @trigger_typing
     async def update(self, ctx, *, flag: str = ""):
         """
