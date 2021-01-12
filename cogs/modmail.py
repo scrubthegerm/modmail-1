@@ -31,7 +31,7 @@ class Modmail(commands.Cog):
         self.bot = bot
 
     @commands.group(aliases=["snippets"], invoke_without_command=True)
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     async def snippet(self, ctx, *, name: str.lower = None):
         """
         Create pre-defined messages for use in threads.
@@ -184,7 +184,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(usage="<category> [options]")
-    @checks.has_permissions(PermissionLevel.MODERATOR)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def move(self, ctx, *, arguments):
         """
@@ -261,7 +261,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(usage="[after] [close message]")
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def close(self, ctx, *, after: UserFriendlyTime = None):
         """
@@ -356,8 +356,56 @@ class Modmail(commands.Cog):
         session = EmbedPaginatorSession(ctx, *embeds)
         await session.run()
 
-    @commands.command()
+    @logs.command(name="closed-by", aliases=["closeby"])
     @checks.has_permissions(PermissionLevel.SUPPORTER)
+    async def logs_closed_by(self, ctx, *, user: User = None):
+        """
+        Get all logs closed by the specified user.
+        If no `user` is provided, the user will be the person who sent this command.
+        `user` may be a user ID, mention, or name.
+        """
+        user = user if user is not None else ctx.author
+
+        entries = await self.bot.api.search_closed_by(user.id)
+        embeds = self.format_log_embeds(entries, avatar_url=self.bot.guild.icon_url)
+
+        if not embeds:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description="No log entries have been found for that query.",
+            )
+            return await ctx.send(embed=embed)
+
+        session = EmbedPaginatorSession(ctx, *embeds)
+        await session.run()
+
+    @logs.command(name="delete", aliases=["wipe"])
+    @checks.has_permissions(PermissionLevel.OWNER)
+    async def logs_delete(self, ctx, key_or_link: str):
+        """
+        Wipe a log entry from the database.
+        """
+        key = key_or_link.split("/")[-1]
+
+        success = await self.bot.api.delete_log_entry(key)
+
+        if not success:
+            embed = discord.Embed(
+                title="Error",
+                description=f"Log entry `{key}` not found.",
+                color=self.bot.error_color,
+            )
+        else:
+            embed = discord.Embed(
+                title="Success",
+                description=f"Log entry `{key}` successfully deleted.",
+                color=self.bot.main_color,
+            )
+
+        await ctx.send(embed=embed)
+
+    @commands.command()
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def reply(self, ctx, *, msg: str = ""):
         """
@@ -370,7 +418,7 @@ class Modmail(commands.Cog):
             await ctx.thread.reply(ctx.message)
 
     @commands.command(aliases=["formatreply"])
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def freply(self, ctx, *, msg: str = ""):
         """
@@ -390,41 +438,25 @@ class Modmail(commands.Cog):
             await ctx.thread.reply(ctx.message)
 
     @commands.command(aliases=["anonreply", "anonymousreply"])
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def areply(self, ctx, *, msg: str = ""):
         """
         Reply to a thread anonymously.
+        You can edit the anonymous user's name,
+        avatar and tag using the config command.
+        Edit the `anon_username`, `anon_avatar_url`
+        and `anon_tag` config variables to do so.
         """
         ctx.message.content = msg
         async with ctx.typing():
             await ctx.thread.reply(ctx.message, anonymous=True)
-            
+
     @commands.command()
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
-    @checks.thread_only()
-    async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
-        """
-        Edit a message that was sent using the reply or anonreply command.
-        If no `message_id` is provided,
-        the last message sent by a staff will be edited.
-        Note: attachments **cannot** be edited.
-        """
-        thread = ctx.thread
-
-        try:
-            await thread.edit_message(message_id, message)
-        except ValueError:
-            return await ctx.send(
-                embed=discord.Embed(
-                    title="Failed",
-                    description="Cannot find a message to edit. Plain messages are not supported.",
-                    color=self.bot.error_color,
-                )
-            )
-
-        sent_emoji, _ = await self.bot.retrieve_emoji()
-        await self.bot.add_reaction(ctx.message, sent_emoji)
+    @checks.has_permissions(PermissionLevel.REGULAR)
+    async def selfcontact(self, ctx):
+        """Creates a thread with yourself"""
+        await ctx.invoke(self.contact, user=ctx.author)
 
     @commands.command(usage="<user> [category] [options]")
     @checks.has_permissions(PermissionLevel.SUPPORTER)
@@ -583,7 +615,7 @@ class Modmail(commands.Cog):
         Leave `user` blank when this command is used within a
         thread channel to block the current recipient.
         `user` may be a user ID, mention, or name.
-        `duration` may be a simple "human-readable" time text. 
+        `duration` may be a simple "human-readable" time text. See `{prefix}help close` for examples.
         """
 
         if user_or_role is None:
@@ -720,7 +752,7 @@ class Modmail(commands.Cog):
         return await ctx.send(embed=embed)
 
     @commands.command()
-    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.has_permissions(PermissionLevel.REGULAR)
     @checks.thread_only()
     async def delete(self, ctx, message_id: int = None):
         """
