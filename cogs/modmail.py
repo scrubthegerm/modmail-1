@@ -83,27 +83,6 @@ class Modmail(commands.Cog):
             name="Modmail", overwrites=overwrites
         )
 
-        await category.edit(position=0)
-
-        log_channel = await self.bot.modmail_guild.create_text_channel(
-            name="bot-logs", category=category
-        )
-
-        embed = discord.Embed(
-            title="Friendly Reminder",
-            description=f"You may use the `{self.bot.prefix}config set log_channel_id "
-            "<channel-id>` command to set up a custom log channel, then you can delete this default "
-            f"{log_channel.mention} log channel.",
-            color=self.bot.main_color,
-        )
-
-        embed.add_field(
-            name="Thanks for using our bot!",
-            value="If you like what you see, consider giving the "
-            "[repo a star](https://github.com/kyb3r/modmail) :star: and if you are "
-            "feeling extra generous, buy us coffee on [Patreon](https://patreon.com/kyber) :heart:!",
-        )
-
         embed.set_footer(text=f'Type "{self.bot.prefix}help" for a complete list of commands.')
         await log_channel.send(embed=embed)
 
