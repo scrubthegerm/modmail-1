@@ -1,3 +1,4 @@
+
 import asyncio
 import re
 from datetime import datetime
@@ -30,8 +31,102 @@ class Modmail(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.command()
+    @trigger_typing
+    @checks.has_permissions(PermissionLevel.OWNER)
+    async def setup(self, ctx):
+        """
+        Sets up a server for Modmail.
+        You only need to run this command
+        once after configuring Modmail.
+        """
+
+        if ctx.guild != self.bot.modmail_guild:
+            return await ctx.send(
+                f"You can only setup in the Modmail guild: {self.bot.modmail_guild}."
+            )
+
+        if self.bot.main_category is not None:
+            logger.debug("Can't re-setup server, main_category is found.")
+            return await ctx.send(f"{self.bot.modmail_guild} is already set up.")
+
+        if self.bot.modmail_guild is None:
+            embed = discord.Embed(
+                title="Error",
+                description="Modmail functioning guild not found.",
+                color=self.bot.error_color,
+            )
+            return await ctx.send(embed=embed)
+
+        overwrites = {
+            self.bot.modmail_guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            self.bot.modmail_guild.me: discord.PermissionOverwrite(read_messages=True),
+        }
+
+        for level in PermissionLevel:
+            if level <= PermissionLevel.REGULAR:
+                continue
+            permissions = self.bot.config["level_permissions"].get(level.name, [])
+            for perm in permissions:
+                perm = int(perm)
+                if perm == -1:
+                    key = self.bot.modmail_guild.default_role
+                else:
+                    key = self.bot.modmail_guild.get_member(perm)
+                    if key is None:
+                        key = self.bot.modmail_guild.get_role(perm)
+                if key is not None:
+                    logger.info("Granting %s access to Modmail category.", key.name)
+                    overwrites[key] = discord.PermissionOverwrite(read_messages=True)
+
+        category = await self.bot.modmail_guild.create_category(
+            name="Modmail", overwrites=overwrites
+        )
+
+        await category.edit(position=0)
+
+        log_channel = await self.bot.modmail_guild.create_text_channel(
+            name="bot-logs", category=category
+        )
+
+        embed = discord.Embed(
+            title="Friendly Reminder",
+            description=f"You may use the `{self.bot.prefix}config set log_channel_id "
+            "<channel-id>` command to set up a custom log channel, then you can delete this default "
+            f"{log_channel.mention} log channel.",
+            color=self.bot.main_color,
+        )
+
+        embed.add_field(
+            name="Thanks for using our bot!",
+            value="If you like what you see, consider giving the "
+            "[repo a star](https://github.com/kyb3r/modmail) :star: and if you are "
+            "feeling extra generous, buy us coffee on [Patreon](https://patreon.com/kyber) :heart:!",
+        )
+
+        embed.set_footer(text=f'Type "{self.bot.prefix}help" for a complete list of commands.')
+        await log_channel.send(embed=embed)
+
+        self.bot.config["main_category_id"] = category.id
+        self.bot.config["log_channel_id"] = log_channel.id
+
+        await self.bot.config.update()
+        await ctx.send(
+            "**Successfully set up server.**\n"
+            "Consider setting permission levels to give access to roles "
+            "or users the ability to use Modmail.\n\n"
+            f"Type:\n- `{self.bot.prefix}permissions` and `{self.bot.prefix}permissions add` "
+            "for more info on setting permissions.\n"
+            f"- `{self.bot.prefix}config help` for a list of available customizations."
+        )
+
+        if not self.bot.config["command_permissions"] and not self.bot.config["level_permissions"]:
+            await self.bot.update_perms(PermissionLevel.REGULAR, -1)
+            for owner_id in self.bot.bot_owner_ids:
+                await self.bot.update_perms(PermissionLevel.OWNER, owner_id)
+
     @commands.group(aliases=["snippets"], invoke_without_command=True)
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
     async def snippet(self, ctx, *, name: str.lower = None):
         """
         Create pre-defined messages for use in threads.
@@ -184,7 +279,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(usage="<category> [options]")
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.MODERATOR)
     @checks.thread_only()
     async def move(self, ctx, *, arguments):
         """
@@ -261,7 +356,7 @@ class Modmail(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(usage="[after] [close message]")
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
     @checks.thread_only()
     async def close(self, ctx, *, after: UserFriendlyTime = None):
         """
@@ -318,6 +413,235 @@ class Modmail(commands.Cog):
         elif user_or_role in {"here", "everyone", "@here", "@everyone"}:
             mention = "@" + user_or_role.lstrip("@")
         return mention
+
+    @commands.command(aliases=["alert"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def notify(
+        self, ctx, *, user_or_role: Union[discord.Role, User, str.lower, None] = None
+    ):
+        """
+        Notify a user or role when the next thread message received.
+        Once a thread message is received, `user_or_role` will be pinged once.
+        Leave `user_or_role` empty to notify yourself.
+        `@here` and `@everyone` can be substituted with `here` and `everyone`.
+        `user_or_role` may be a user ID, mention, name. role ID, mention, name, "everyone", or "here".
+        """
+        mention = self.parse_user_or_role(ctx, user_or_role)
+        if mention is None:
+            raise commands.BadArgument(f"{user_or_role} is not a valid user or role.")
+
+        thread = ctx.thread
+
+        if str(thread.id) not in self.bot.config["notification_squad"]:
+            self.bot.config["notification_squad"][str(thread.id)] = []
+
+        mentions = self.bot.config["notification_squad"][str(thread.id)]
+
+        if mention in mentions:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description=f"{mention} is already going to be mentioned.",
+            )
+        else:
+            mentions.append(mention)
+            await self.bot.config.update()
+            embed = discord.Embed(
+                color=self.bot.main_color,
+                description=f"{mention} will be mentioned on the next message received.",
+            )
+        return await ctx.send(embed=embed)
+
+    @commands.command(aliases=["unalert"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def unnotify(
+        self, ctx, *, user_or_role: Union[discord.Role, User, str.lower, None] = None
+    ):
+        """
+        Un-notify a user, role, or yourself from a thread.
+        Leave `user_or_role` empty to un-notify yourself.
+        `@here` and `@everyone` can be substituted with `here` and `everyone`.
+        `user_or_role` may be a user ID, mention, name, role ID, mention, name, "everyone", or "here".
+        """
+        mention = self.parse_user_or_role(ctx, user_or_role)
+        if mention is None:
+            mention = f"`{user_or_role}`"
+
+        thread = ctx.thread
+
+        if str(thread.id) not in self.bot.config["notification_squad"]:
+            self.bot.config["notification_squad"][str(thread.id)] = []
+
+        mentions = self.bot.config["notification_squad"][str(thread.id)]
+
+        if mention not in mentions:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description=f"{mention} does not have a pending notification.",
+            )
+        else:
+            mentions.remove(mention)
+            await self.bot.config.update()
+            embed = discord.Embed(
+                color=self.bot.main_color, description=f"{mention} will no longer be notified."
+            )
+        return await ctx.send(embed=embed)
+
+    @commands.command(aliases=["sub"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def subscribe(
+        self, ctx, *, user_or_role: Union[discord.Role, User, str.lower, None] = None
+    ):
+        """
+        Notify a user, role, or yourself for every thread message received.
+        You will be pinged for every thread message received until you unsubscribe.
+        Leave `user_or_role` empty to subscribe yourself.
+        `@here` and `@everyone` can be substituted with `here` and `everyone`.
+        `user_or_role` may be a user ID, mention, name, role ID, mention, name, "everyone", or "here".
+        """
+        mention = self.parse_user_or_role(ctx, user_or_role)
+        if mention is None:
+            raise commands.BadArgument(f"{user_or_role} is not a valid user or role.")
+
+        thread = ctx.thread
+
+        if str(thread.id) not in self.bot.config["subscriptions"]:
+            self.bot.config["subscriptions"][str(thread.id)] = []
+
+        mentions = self.bot.config["subscriptions"][str(thread.id)]
+
+        if mention in mentions:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description=f"{mention} is not subscribed to this thread.",
+            )
+        else:
+            mentions.append(mention)
+            await self.bot.config.update()
+            embed = discord.Embed(
+                color=self.bot.main_color,
+                description=f"{mention} will now be notified of all messages received.",
+            )
+        return await ctx.send(embed=embed)
+
+    @commands.command(aliases=["unsub"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def unsubscribe(
+        self, ctx, *, user_or_role: Union[discord.Role, User, str.lower, None] = None
+    ):
+        """
+        Unsubscribe a user, role, or yourself from a thread.
+        Leave `user_or_role` empty to unsubscribe yourself.
+        `@here` and `@everyone` can be substituted with `here` and `everyone`.
+        `user_or_role` may be a user ID, mention, name, role ID, mention, name, "everyone", or "here".
+        """
+        mention = self.parse_user_or_role(ctx, user_or_role)
+        if mention is None:
+            mention = f"`{user_or_role}`"
+
+        thread = ctx.thread
+
+        if str(thread.id) not in self.bot.config["subscriptions"]:
+            self.bot.config["subscriptions"][str(thread.id)] = []
+
+        mentions = self.bot.config["subscriptions"][str(thread.id)]
+
+        if mention not in mentions:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description=f"{mention} is not subscribed to this thread.",
+            )
+        else:
+            mentions.remove(mention)
+            await self.bot.config.update()
+            embed = discord.Embed(
+                color=self.bot.main_color,
+                description=f"{mention} is now unsubscribed from this thread.",
+            )
+        return await ctx.send(embed=embed)
+
+    @commands.command()
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def nsfw(self, ctx):
+        """Flags a Modmail thread as NSFW (not safe for work)."""
+        await ctx.channel.edit(nsfw=True)
+        sent_emoji, _ = await self.bot.retrieve_emoji()
+        await self.bot.add_reaction(ctx.message, sent_emoji)
+
+    @commands.command()
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def sfw(self, ctx):
+        """Flags a Modmail thread as SFW (safe for work)."""
+        await ctx.channel.edit(nsfw=False)
+        sent_emoji, _ = await self.bot.retrieve_emoji()
+        await self.bot.add_reaction(ctx.message, sent_emoji)
+
+    @commands.command()
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def loglink(self, ctx):
+        """Retrieves the link to the current thread's logs."""
+        log_link = await self.bot.api.get_log_link(ctx.channel.id)
+        await ctx.send(embed=discord.Embed(color=self.bot.main_color, description=log_link))
+
+    def format_log_embeds(self, logs, avatar_url):
+        embeds = []
+        logs = tuple(logs)
+        title = f"Total Results Found ({len(logs)})"
+
+        for entry in logs:
+            created_at = parser.parse(entry["created_at"])
+
+            prefix = self.bot.config["log_url_prefix"].strip("/")
+            if prefix == "NONE":
+                prefix = ""
+            log_url = f"{self.bot.config['log_url'].strip('/')}{'/' + prefix if prefix else ''}/{entry['key']}"
+
+            username = entry["recipient"]["name"] + "#"
+            username += entry["recipient"]["discriminator"]
+
+            embed = discord.Embed(color=self.bot.main_color, timestamp=created_at)
+            embed.set_author(name=f"{title} - {username}", icon_url=avatar_url, url=log_url)
+            embed.url = log_url
+            embed.add_field(name="Created", value=duration(created_at, now=datetime.utcnow()))
+            closer = entry.get("closer")
+            if closer is None:
+                closer_msg = "Unknown"
+            else:
+                closer_msg = f"<@{closer['id']}>"
+            embed.add_field(name="Closed By", value=closer_msg)
+
+            if entry["recipient"]["id"] != entry["creator"]["id"]:
+                embed.add_field(name="Created by", value=f"<@{entry['creator']['id']}>")
+
+            embed.add_field(name="Preview", value=format_preview(entry["messages"]), inline=False)
+
+            if closer is not None:
+                # BUG: Currently, logviewer can't display logs without a closer.
+                embed.add_field(name="Link", value=log_url)
+            else:
+                logger.debug("Invalid log entry: no closer.")
+                embed.add_field(name="Log Key", value=f"`{entry['key']}`")
+
+            embed.set_footer(text="Recipient ID: " + str(entry["recipient"]["id"]))
+            embeds.append(embed)
+        return embeds
+
+    @commands.command(cooldown_after_parsing=True)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    @commands.cooldown(1, 600, BucketType.channel)
+    async def title(self, ctx, *, name: str):
+        """Sets title for a thread"""
+        await ctx.thread.set_title(name)
+        sent_emoji, _ = await self.bot.retrieve_emoji()
+        await ctx.message.pin()
+        await self.bot.add_reaction(ctx.message, sent_emoji)
 
     @commands.group(invoke_without_command=True)
     @checks.has_permissions(PermissionLevel.SUPPORTER)
@@ -404,8 +728,56 @@ class Modmail(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @logs.command(name="responded")
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    async def logs_responded(self, ctx, *, user: User = None):
+        """
+        Get all logs where the specified user has responded at least once.
+        If no `user` is provided, the user will be the person who sent this command.
+        `user` may be a user ID, mention, or name.
+        """
+        user = user if user is not None else ctx.author
+
+        entries = await self.bot.api.get_responded_logs(user.id)
+
+        embeds = self.format_log_embeds(entries, avatar_url=self.bot.guild.icon_url)
+
+        if not embeds:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description=f"{getattr(user, 'mention', user.id)} has not responded to any threads.",
+            )
+            return await ctx.send(embed=embed)
+
+        session = EmbedPaginatorSession(ctx, *embeds)
+        await session.run()
+
+    @logs.command(name="search", aliases=["find"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    async def logs_search(self, ctx, limit: Optional[int] = None, *, query):
+        """
+        Retrieve all logs that contain messages with your query.
+        Provide a `limit` to specify the maximum number of logs the bot should find.
+        """
+
+        await ctx.trigger_typing()
+
+        entries = await self.bot.api.search_by_text(query, limit)
+
+        embeds = self.format_log_embeds(entries, avatar_url=self.bot.guild.icon_url)
+
+        if not embeds:
+            embed = discord.Embed(
+                color=self.bot.error_color,
+                description="No log entries have been found for that query.",
+            )
+            return await ctx.send(embed=embed)
+
+        session = EmbedPaginatorSession(ctx, *embeds)
+        await session.run()
+
     @commands.command()
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
     @checks.thread_only()
     async def reply(self, ctx, *, msg: str = ""):
         """
@@ -418,7 +790,7 @@ class Modmail(commands.Cog):
             await ctx.thread.reply(ctx.message)
 
     @commands.command(aliases=["formatreply"])
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
     @checks.thread_only()
     async def freply(self, ctx, *, msg: str = ""):
         """
@@ -438,7 +810,7 @@ class Modmail(commands.Cog):
             await ctx.thread.reply(ctx.message)
 
     @commands.command(aliases=["anonreply", "anonymousreply"])
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
     @checks.thread_only()
     async def areply(self, ctx, *, msg: str = ""):
         """
@@ -451,6 +823,86 @@ class Modmail(commands.Cog):
         ctx.message.content = msg
         async with ctx.typing():
             await ctx.thread.reply(ctx.message, anonymous=True)
+
+    @commands.command(aliases=["plainreply"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def preply(self, ctx, *, msg: str = ""):
+        """
+        Reply to a Modmail thread with a plain message.
+        Supports attachments and images as well as
+        automatically embedding image URLs.
+        """
+        ctx.message.content = msg
+        async with ctx.typing():
+            await ctx.thread.reply(ctx.message, plain=True)
+
+    @commands.command(aliases=["plainanonreply", "plainanonymousreply"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def pareply(self, ctx, *, msg: str = ""):
+        """
+        Reply to a Modmail thread with a plain message and anonymously.
+        Supports attachments and images as well as
+        automatically embedding image URLs.
+        """
+        ctx.message.content = msg
+        async with ctx.typing():
+            await ctx.thread.reply(ctx.message, anonymous=True, plain=True)
+
+    @commands.group(invoke_without_command=True)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def note(self, ctx, *, msg: str = ""):
+        """
+        Take a note about the current thread.
+        Useful for noting context.
+        """
+        ctx.message.content = msg
+        async with ctx.typing():
+            msg = await ctx.thread.note(ctx.message)
+            await msg.pin()
+
+    @note.command(name="persistent", aliases=["persist"])
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def note_persistent(self, ctx, *, msg: str = ""):
+        """
+        Take a persistent note about the current user.
+        """
+        ctx.message.content = msg
+        async with ctx.typing():
+            msg = await ctx.thread.note(ctx.message, persistent=True)
+            await msg.pin()
+        await self.bot.api.create_note(
+            recipient=ctx.thread.recipient, message=ctx.message, message_id=msg.id
+        )
+
+    @commands.command()
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    @checks.thread_only()
+    async def edit(self, ctx, message_id: Optional[int] = None, *, message: str):
+        """
+        Edit a message that was sent using the reply or anonreply command.
+        If no `message_id` is provided,
+        the last message sent by a staff will be edited.
+        Note: attachments **cannot** be edited.
+        """
+        thread = ctx.thread
+
+        try:
+            await thread.edit_message(message_id, message)
+        except ValueError:
+            return await ctx.send(
+                embed=discord.Embed(
+                    title="Failed",
+                    description="Cannot find a message to edit. Plain messages are not supported.",
+                    color=self.bot.error_color,
+                )
+            )
+
+        sent_emoji, _ = await self.bot.retrieve_emoji()
+        await self.bot.add_reaction(ctx.message, sent_emoji)
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.REGULAR)
@@ -598,6 +1050,60 @@ class Modmail(commands.Cog):
         session = EmbedPaginatorSession(ctx, *embeds)
 
         await session.run()
+
+    @blocked.command(name="whitelist")
+    @checks.has_permissions(PermissionLevel.MODERATOR)
+    @trigger_typing
+    async def blocked_whitelist(self, ctx, *, user: User = None):
+        """
+        Whitelist or un-whitelist a user from getting blocked.
+        Useful for preventing users from getting blocked by account_age/guild_age restrictions.
+        """
+        if user is None:
+            thread = ctx.thread
+            if thread:
+                user = thread.recipient
+            else:
+                return await ctx.send_help(ctx.command)
+
+        mention = getattr(user, "mention", f"`{user.id}`")
+        msg = ""
+
+        if str(user.id) in self.bot.blocked_whitelisted_users:
+            embed = discord.Embed(
+                title="Success",
+                description=f"{mention} is no longer whitelisted.",
+                color=self.bot.main_color,
+            )
+            self.bot.blocked_whitelisted_users.remove(str(user.id))
+            return await ctx.send(embed=embed)
+
+        self.bot.blocked_whitelisted_users.append(str(user.id))
+
+        if str(user.id) in self.bot.blocked_users:
+            msg = self.bot.blocked_users.get(str(user.id)) or ""
+            self.bot.blocked_users.pop(str(user.id))
+
+        await self.bot.config.update()
+
+        if msg.startswith("System Message: "):
+            # If the user is blocked internally (for example: below minimum account age)
+            # Show an extended message stating the original internal message
+            reason = msg[16:].strip().rstrip(".")
+            embed = discord.Embed(
+                title="Success",
+                description=f"{mention} was previously blocked internally for "
+                f'"{reason}". {mention} is now whitelisted.',
+                color=self.bot.main_color,
+            )
+        else:
+            embed = discord.Embed(
+                title="Success",
+                color=self.bot.main_color,
+                description=f"{mention} is now whitelisted.",
+            )
+
+        return await ctx.send(embed=embed)
 
     @commands.command(usage="[user] [duration] [reason]")
     @checks.has_permissions(PermissionLevel.MODERATOR)
@@ -752,11 +1258,11 @@ class Modmail(commands.Cog):
         return await ctx.send(embed=embed)
 
     @commands.command()
-    @checks.has_permissions(PermissionLevel.REGULAR)
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
     @checks.thread_only()
     async def delete(self, ctx, message_id: int = None):
         """
-        Delete a message that was sent using the reply command.
+        Delete a message that was sent using the reply command or a note.
         Deletes the previous message, unless a message ID is provided,
         which in that case, deletes the message with that message ID.
         Notes can only be deleted when a note ID is provided.
@@ -777,6 +1283,117 @@ class Modmail(commands.Cog):
 
         sent_emoji, _ = await self.bot.retrieve_emoji()
         await self.bot.add_reaction(ctx.message, sent_emoji)
+
+    @commands.command()
+    @checks.has_permissions(PermissionLevel.SUPPORTER)
+    async def repair(self, ctx):
+        """
+        Repair a thread broken by Discord.
+        """
+        sent_emoji, blocked_emoji = await self.bot.retrieve_emoji()
+
+        if ctx.thread:
+            user_id = match_user_id(ctx.channel.topic)
+            if user_id == -1:
+                logger.info("Setting current channel's topic to User ID.")
+                await ctx.channel.edit(topic=f"User ID: {ctx.thread.id}")
+            return await self.bot.add_reaction(ctx.message, sent_emoji)
+
+        logger.info("Attempting to fix a broken thread %s.", ctx.channel.name)
+
+        # Search cache for channel
+        user_id, thread = next(
+            ((k, v) for k, v in self.bot.threads.cache.items() if v.channel == ctx.channel),
+            (-1, None),
+        )
+        if thread is not None:
+            logger.debug("Found thread with tempered ID.")
+            await ctx.channel.edit(reason="Fix broken Modmail thread", topic=f"User ID: {user_id}")
+            return await self.bot.add_reaction(ctx.message, sent_emoji)
+
+        # find genesis message to retrieve User ID
+        async for message in ctx.channel.history(limit=10, oldest_first=True):
+            if (
+                message.author == self.bot.user
+                and message.embeds
+                and message.embeds[0].color
+                and message.embeds[0].color.value == self.bot.main_color
+                and message.embeds[0].footer.text
+            ):
+                user_id = match_user_id(message.embeds[0].footer.text)
+                if user_id != -1:
+                    recipient = self.bot.get_user(user_id)
+                    if recipient is None:
+                        self.bot.threads.cache[user_id] = thread = Thread(
+                            self.bot.threads, user_id, ctx.channel
+                        )
+                    else:
+                        self.bot.threads.cache[user_id] = thread = Thread(
+                            self.bot.threads, recipient, ctx.channel
+                        )
+                    thread.ready = True
+                    logger.info(
+                        "Setting current channel's topic to User ID and created new thread."
+                    )
+                    await ctx.channel.edit(
+                        reason="Fix broken Modmail thread", topic=f"User ID: {user_id}"
+                    )
+                    return await self.bot.add_reaction(ctx.message, sent_emoji)
+
+        else:
+            logger.warning("No genesis message found.")
+
+        # match username from channel name
+        # username-1234, username-1234_1, username-1234_2
+        m = re.match(r"^(.+)-(\d{4})(?:_\d+)?$", ctx.channel.name)
+        if m is not None:
+            users = set(
+                filter(
+                    lambda member: member.name == m.group(1)
+                    and member.discriminator == m.group(2),
+                    ctx.guild.members,
+                )
+            )
+            if len(users) == 1:
+                user = users.pop()
+                name = format_channel_name(
+                    user, self.bot.modmail_guild, exclude_channel=ctx.channel
+                )
+                recipient = self.bot.get_user(user.id)
+                if user.id in self.bot.threads.cache:
+                    thread = self.bot.threads.cache[user.id]
+                    if thread.channel:
+                        embed = discord.Embed(
+                            title="Delete Channel",
+                            description="This thread channel is no longer in use. "
+                            f"All messages will be directed to {ctx.channel.mention} instead.",
+                            color=self.bot.error_color,
+                        )
+                        embed.set_footer(
+                            text='Please manually delete this channel, do not use "{prefix}close".'
+                        )
+                        try:
+                            await thread.channel.send(embed=embed)
+                        except discord.HTTPException:
+                            pass
+                if recipient is None:
+                    self.bot.threads.cache[user.id] = thread = Thread(
+                        self.bot.threads, user_id, ctx.channel
+                    )
+                else:
+                    self.bot.threads.cache[user.id] = thread = Thread(
+                        self.bot.threads, recipient, ctx.channel
+                    )
+                thread.ready = True
+                logger.info("Setting current channel's topic to User ID and created new thread.")
+                await ctx.channel.edit(
+                    reason="Fix broken Modmail thread", name=name, topic=f"User ID: {user.id}"
+                )
+                return await self.bot.add_reaction(ctx.message, sent_emoji)
+
+            elif len(users) >= 2:
+                logger.info("Multiple users with the same name and discriminator.")
+        return await self.bot.add_reaction(ctx.message, blocked_emoji)
 
     @commands.command()
     @checks.has_permissions(PermissionLevel.ADMINISTRATOR)
